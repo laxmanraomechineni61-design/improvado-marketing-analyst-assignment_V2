@@ -50,7 +50,7 @@ WITH facebook AS (
         NULL                                AS shares,
         NULL                                AS comments
 
-    FROM `your_project.your_dataset.facebook_ads`
+    FROM `improvado-assignment-498500.marketing_data.facebook_ads`
 
 ),
 
@@ -94,7 +94,7 @@ google AS (
         NULL                                AS shares,
         NULL                                AS comments
 
-    FROM `your_project.your_dataset.google_ads`
+    FROM `improvado-assignment-498500.marketing_data.google_ads`
 
 ),
 
@@ -138,7 +138,7 @@ tiktok AS (
         shares,
         comments
 
-    FROM `your_project.your_dataset.tiktok_ads`
+    FROM `improvado-assignment-498500.marketing_data.tiktok_ads`
 
 )
 
