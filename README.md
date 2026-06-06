@@ -42,26 +42,51 @@ Without normalization, cross-platform comparison is impossible.
 
 ---
 
-## How to Run
+## How to Run in BigQuery
 
-```sql
--- In BigQuery, run unified_model.sql against:
--- Project: improvado-assignment-498500
--- Dataset: marketing_data
--- Tables: facebook_ads, google_ads, tiktok_ads
+```
+Step 1 — Upload raw CSVs as tables:
+  marketing_data.facebook_ads
+  marketing_data.google_ads
+  marketing_data.tiktok_ads
+
+Step 2 — Run in order:
+  unified_model.sql              → creates unified_ads VIEW (base table)
+  views/01_platform_summary.sql  → per-platform KPI cards
+  views/02_campaign_performance.sql → leaderboard + scatter + sankey
+  views/03_daily_trend.sql       → spend/CPA line chart (daily)
+  views/04_tiktok_funnel.sql     → video completion funnel
+  views/05_quality_score_analysis.sql → Google QS vs CTR
+  views/06_budget_vs_conversion.sql → budget vs conversion share
+
+Step 3 — Connect each view as a data source in Looker Studio
 ```
 
-Output schema of the unified table: 28 columns
+### BigQuery Views → Looker Studio Widgets Mapping
+
+| BigQuery View | Looker Studio Widget |
+|---|---|
+| `unified_ads` | Base source — all raw data |
+| `platform_summary` | Colored platform KPI tiles (Facebook / Google / TikTok) |
+| `campaign_performance` | Leaderboard table + Scatter plot + Sankey flow |
+| `daily_trend` | "Platforms Spending Overtime" line chart |
+| `tiktok_funnel` | TikTok video completion funnel |
+| `quality_score_analysis` | Google QS vs CTR bar chart |
+| `budget_vs_conversion` | Budget vs Conversion share donuts |
+
+### Unified Table Schema — 35 columns
 
 ```
 date, platform, campaign_id, campaign_name,
 ad_group_id, ad_group_name, impressions, clicks, spend,
-conversions, video_views, ctr, cpa, cpm,
-engagement_rate, reach, frequency,          -- Facebook only
+conversions, video_views,
+ctr, cpa, cpm, cpc, conversion_rate, roas,
+video_completion_rate,
+engagement_rate, reach, frequency,              -- Facebook only
 conversion_value, avg_cpc, quality_score,
-search_impression_share,                    -- Google only
+search_impression_share,                        -- Google only
 video_watch_25/50/75/100, likes, shares,
-comments                                    -- TikTok only
+comments, total_engagements                     -- TikTok only
 ```
 
 ---
