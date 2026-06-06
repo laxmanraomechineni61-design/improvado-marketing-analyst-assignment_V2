@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cross-Channel Marketing Dashboard — Jan 2024</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+  /* HEADER */
+  .header { background: linear-gradient(135deg, #1a1f2e 0%, #16213e 100%); padding: 20px 32px; border-bottom: 1px solid #2d3748; display: flex; align-items: center; justify-content: space-between; }
+  .header-left h1 { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+  .header-left p { font-size: 13px; color: #718096; margin-top: 3px; }
+  .header-right { display: flex; gap: 12px; align-items: center; }
+  .badge { background: #2d3748; border: 1px solid #4a5568; border-radius: 20px; padding: 6px 14px; font-size: 12px; color: #a0aec0; }
+  .badge.live { border-color: #48bb78; color: #68d391; }
+  .badge.live::before { content: '●'; margin-right: 5px; }
+
+  /* FILTERS */
+  .filters { background: #1a1f2e; padding: 12px 32px; border-bottom: 1px solid #2d3748; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .filter-label { font-size: 12px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .filter-btn { background: #2d3748; border: 1px solid #4a5568; color: #a0aec0; padding: 6px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+  .filter-btn:hover, .filter-btn.active { background: #4299e1; border-color: #4299e1; color: #fff; }
+  .filter-btn.fb.active { background: #1877f2; border-color: #1877f2; }
+  .filter-btn.gg.active { background: #ea4335; border-color: #ea4335; }
+  .filter-btn.tt.active { background: #ff0050; border-color: #ff0050; }
+  select { background: #2d3748; border: 1px solid #4a5568; color: #e2e8f0; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+
+  /* MAIN */
+  .main { padding: 24px 32px; }
+
+  /* SCORECARDS */
+  .scorecards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
+  .card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 12px; padding: 20px; position: relative; overflow: hidden; transition: transform 0.2s; }
+  .card:hover { transform: translateY(-2px); }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .card.spend::before { background: linear-gradient(90deg, #f6ad55, #ed8936); }
+  .card.conv::before { background: linear-gradient(90deg, #68d391, #48bb78); }
+  .card.cpa::before { background: linear-gradient(90deg, #63b3ed, #4299e1); }
+  .card.ctr::before { background: linear-gradient(90deg, #b794f4, #9f7aea); }
+  .card.impr::before { background: linear-gradient(90deg, #fc8181, #f56565); }
+  .card-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: #718096; margin-bottom: 10px; }
+  .card-value { font-size: 28px; font-weight: 700; color: #fff; line-height: 1; }
+  .card-sub { font-size: 12px; color: #718096; margin-top: 6px; }
+  .card-delta { font-size: 12px; margin-top: 8px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+  .card-delta.up { background: #1c4532; color: #68d391; }
+  .card-delta.down { background: #742a2a; color: #fc8181; }
+
+  /* GRID ROWS */
+  .row { display: grid; gap: 16px; margin-bottom: 16px; }
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  .row-3 { grid-template-columns: 2fr 1fr 1fr; }
+  .row-21 { grid-template-columns: 2fr 1fr; }
+  .row-12 { grid-template-columns: 1fr 2fr; }
+
+  /* CHART CARDS */
+  .chart-card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 12px; padding: 20px; }
+  .chart-title { font-size: 14px; font-weight: 600; color: #e2e8f0; margin-bottom: 4px; }
+  .chart-sub { font-size: 12px; color: #718096; margin-bottom: 16px; }
+  .chart-wrap { position: relative; }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; max-height: 340px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: #2d3748; color: #a0aec0; font-weight: 600; padding: 10px 12px; text-align: left; position: sticky; top: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; white-space: nowrap; }
+  thead th:hover { color: #e2e8f0; }
+  thead th.sorted { color: #63b3ed; }
+  tbody tr { border-bottom: 1px solid #2d3748; transition: background 0.15s; }
+  tbody tr:hover { background: #2d3748; }
+  tbody td { padding: 10px 12px; color: #e2e8f0; white-space: nowrap; }
+  .platform-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .platform-tag.Facebook { background: #1877f220; color: #4299e1; border: 1px solid #1877f240; }
+  .platform-tag.Google { background: #ea433520; color: #fc8181; border: 1px solid #ea433540; }
+  .platform-tag.TikTok { background: #ff005020; color: #f687b3; border: 1px solid #ff005040; }
+  .cpa-bar { display: flex; align-items: center; gap: 8px; }
+  .cpa-fill { height: 6px; border-radius: 3px; background: linear-gradient(90deg, #48bb78, #68d391); }
+  td.bad { color: #fc8181; }
+  td.good { color: #68d391; }
+
+  /* INSIGHT BOXES */
+  .insights { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .insight { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px; padding: 16px; border-left: 3px solid; }
+  .insight.warn { border-left-color: #f6ad55; }
+  .insight.good { border-left-color: #68d391; }
+  .insight.info { border-left-color: #63b3ed; }
+  .insight-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .insight.warn .insight-title { color: #f6ad55; }
+  .insight.good .insight-title { color: #68d391; }
+  .insight.info .insight-title { color: #63b3ed; }
+  .insight-text { font-size: 13px; color: #a0aec0; line-height: 1.5; }
+  .insight-text strong { color: #e2e8f0; }
+
+  /* FUNNEL */
+  .funnel { padding: 8px 0; }
+  .funnel-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .funnel-label { font-size: 12px; color: #a0aec0; width: 110px; flex-shrink: 0; }
+  .funnel-bar-wrap { flex: 1; background: #2d3748; border-radius: 4px; height: 28px; overflow: hidden; position: relative; }
+  .funnel-bar { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 10px; font-size: 12px; font-weight: 600; color: #fff; transition: width 0.6s ease; }
+  .funnel-pct { font-size: 13px; color: #e2e8f0; font-weight: 600; width: 50px; text-align: right; flex-shrink: 0; }
+  .funnel-drop { font-size: 11px; color: #fc8181; width: 60px; flex-shrink: 0; }
+
+  /* FOOTER */
+  .footer { padding: 16px 32px; border-top: 1px solid #2d3748; display: flex; justify-content: space-between; align-items: center; }
+  .footer-left { font-size: 12px; color: #4a5568; }
+  .footer-right { font-size: 12px; color: #4a5568; }
+
+  /* TOOLTIP STYLE */
+  .tab-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid #4a5568; color: #a0aec0; background: transparent; }
+  .tab.active { background: #2d3748; color: #e2e8f0; border-color: #718096; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>📊 Cross-Channel Marketing Performance</h1>
+    <p>Facebook · Google Ads · TikTok — January 2024 · Unified Data Model</p>
+  </div>
+  <div class="header-right">
+    <span class="badge live">Live Data</span>
+    <span class="badge">BigQuery · Unified Schema</span>
+    <span class="badge">330 rows · 3 platforms</span>
+  </div>
+</div>
+
+<div class="filters">
+  <span class="filter-label">Platform:</span>
+  <button class="filter-btn active" onclick="filterPlatform('All', this)">All</button>
+  <button class="filter-btn fb" onclick="filterPlatform('Facebook', this)">Facebook</button>
+  <button class="filter-btn gg" onclick="filterPlatform('Google', this)">Google</button>
+  <button class="filter-btn tt" onclick="filterPlatform('TikTok', this)">TikTok</button>
+  <span class="filter-label" style="margin-left:16px">Campaign:</span>
+  <select id="campFilter" onchange="filterCampaign(this.value)">
+    <option value="All">All Campaigns</option>
+  </select>
+  <span class="filter-label" style="margin-left:16px">Metric:</span>
+  <select id="trendMetric" onchange="updateTrendChart()">
+    <option value="cpa">CPA</option>
+    <option value="ctr">CTR</option>
+    <option value="cpm">CPM</option>
+    <option value="spend">Spend</option>
+    <option value="conversions">Conversions</option>
+  </select>
+</div>
+
+<div class="main">
+
+  <!-- SCORECARDS -->
+  <div class="scorecards" id="scorecards"></div>
+
+  <!-- INSIGHTS -->
+  <div class="insights">
+    <div class="insight good">
+      <div class="insight-title">🏆 Best Performer</div>
+      <div class="insight-text"><strong>Google Search Brand Terms</strong> — CPA $5.10, CTR 5.22%. Most efficient campaign across all platforms.</div>
+    </div>
+    <div class="insight warn">
+      <div class="insight-title">⚠️ Budget Inefficiency</div>
+      <div class="insight-text"><strong>TikTok gets 57% of budget</strong> but delivers only 50.5% of conversions. Facebook delivers 17.9% with just 14% of budget.</div>
+    </div>
+    <div class="insight info">
+      <div class="insight-title">📉 Pause Immediately</div>
+      <div class="insight-text"><strong>Google Generic Search — $24.80 CPA</strong>, 4.9× worse than Brand Terms on the same platform. Redirect budget now.</div>
+    </div>
+  </div>
+
+  <!-- ROW 1: Platform CPA + Budget vs Conv -->
+  <div class="row row-2">
+    <div class="chart-card">
+      <div class="chart-title">Platform Performance Comparison</div>
+      <div class="chart-sub">CPA, CTR, CPM side-by-side — lower CPA = better efficiency</div>
+      <div class="tab-row">
+        <button class="tab active" onclick="switchPlatformTab('cpa',this)">CPA</button>
+        <button class="tab" onclick="switchPlatformTab('ctr',this)">CTR</button>
+        <button class="tab" onclick="switchPlatformTab('cpm',this)">CPM</button>
+        <button class="tab" onclick="switchPlatformTab('impressions',this)">Impressions</button>
+      </div>
+      <div class="chart-wrap" style="height:220px"><canvas id="platformChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Budget vs Conversion Share</div>
+      <div class="chart-sub">Where money goes vs where results come from</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;height:240px">
+        <div>
+          <p style="text-align:center;font-size:12px;color:#718096;margin-bottom:4px">Budget Split</p>
+          <canvas id="budgetPie"></canvas>
+        </div>
+        <div>
+          <p style="text-align:center;font-size:12px;color:#718096;margin-bottom:4px">Conversion Split</p>
+          <canvas id="convPie"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Weekly Trend -->
+  <div class="row" style="margin-bottom:16px">
+    <div class="chart-card">
+      <div class="chart-title">Weekly Performance Trend</div>
+      <div class="chart-sub">Track how each platform improves (or doesn't) week over week — select metric above</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="trendChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 3: Campaign Table -->
+  <div class="chart-card" style="margin-bottom:16px">
+    <div class="chart-title">Campaign Leaderboard</div>
+    <div class="chart-sub">Click any column to sort — ranked by CPA by default (lower = better)</div>
+    <div class="table-wrap">
+      <table id="leaderboard">
+        <thead>
+          <tr>
+            <th onclick="sortTable('rank')">#</th>
+            <th onclick="sortTable('platform')">Platform</th>
+            <th onclick="sortTable('campaign_name')">Campaign</th>
+            <th onclick="sortTable('spend')">Spend</th>
+            <th onclick="sortTable('conversions')">Conversions</th>
+            <th onclick="sortTable('cpa')" class="sorted">CPA ↑</th>
+            <th onclick="sortTable('ctr')">CTR</th>
+            <th onclick="sortTable('cpm')">CPM</th>
+            <th onclick="sortTable('impressions')">Impressions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ROW 4: TikTok Funnel + QS Chart -->
+  <div class="row row-2">
+    <div class="chart-card">
+      <div class="chart-title">TikTok Video Completion Funnel</div>
+      <div class="chart-sub">How many viewers reach each checkpoint — only 26% complete the ad</div>
+      <div class="funnel" id="funnel"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Google Quality Score vs CTR</div>
+      <div class="chart-sub">Higher QS = 2.6× better click-through rate — biggest lever in Google</div>
+      <div class="chart-wrap" style="height:260px"><canvas id="qsChart"></canvas></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <div class="footer-left">Data source: BigQuery · improvado-assignment-498500.marketing_data · Unified via SQL UNION ALL</div>
+  <div class="footer-right">Cross-Channel Marketing Performance Analysis · January 2024</div>
+</div>
+
+<script>
+// ── RAW DATA ──────────────────────────────────────────────────────────
+
+// ── STATE ─────────────────────────────────────────────────────────────
+let currentPlatform = 'All';
+let currentCampaign = 'All';
+let currentPlatformMetric = 'cpa';
+let sortKey = 'cpa';
+let sortAsc = true;
+let charts = {};
+
+const COLORS = {
+  Facebook: { bg: 'rgba(66,153,225,0.8)', border: '#4299e1' },
+  Google:   { bg: 'rgba(252,129,129,0.8)', border: '#fc8181' },
+  TikTok:   { bg: 'rgba(246,135,177,0.8)', border: '#f687b3' },
+};
+const PLATFORM_ORDER = ['Facebook','Google','TikTok'];
+
+// ── HELPERS ───────────────────────────────────────────────────────────
+function filtered() {
+  return RAW_DATA.filter(r =>
+    (currentPlatform === 'All' || r.platform === currentPlatform) &&
+    (currentCampaign === 'All' || r.campaign_name === currentCampaign)
+  );
+}
+
+function agg(rows) {
+  return rows.reduce((a, r) => ({
+    spend: a.spend + r.spend,
+    conversions: a.conversions + r.conversions,
+    impressions: a.impressions + r.impressions,
+    clicks: a.clicks + r.clicks,
+  }), { spend:0, conversions:0, impressions:0, clicks:0 });
+}
+
+function kpis(a) {
+  return {
+    ...a,
+    cpa: a.conversions ? a.spend / a.conversions : 0,
+    ctr: a.impressions ? a.clicks / a.impressions : 0,
+    cpm: a.impressions ? a.spend / a.impressions * 1000 : 0,
+  };
+}
+
+function fmt(n, type) {
+  if (type === '$') return '$' + n.toLocaleString('en-US', {maximumFractionDigits:2, minimumFractionDigits:2});
+  if (type === '%') return (n*100).toFixed(2)+'%';
+  if (type === 'M') return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'K' : n.toFixed(0);
+  return n.toLocaleString();
+}
+
+// ── POPULATE CAMPAIGN DROPDOWN ────────────────────────────────────────
+function populateCampaigns() {
+  const sel = document.getElementById('campFilter');
+  const camps = [...new Set(RAW_DATA.map(r=>r.campaign_name))].sort();
+  camps.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.text = c.replace(/_/g,' ');
+    sel.appendChild(o);
+  });
+}
+
+// ── SCORECARDS ────────────────────────────────────────────────────────
+function renderScorecards() {
+  const rows = filtered();
+  const a = kpis(agg(rows));
+  const total = kpis(agg(RAW_DATA));
+  const el = document.getElementById('scorecards');
+  el.innerHTML = `
+    <div class="card spend">
+      <div class="card-label">Total Spend</div>
+      <div class="card-value">${fmt(a.spend,'$')}</div>
+      <div class="card-sub">${currentPlatform === 'All' ? 'All platforms' : currentPlatform}</div>
+    </div>
+    <div class="card conv">
+      <div class="card-label">Total Conversions</div>
+      <div class="card-value">${a.conversions.toLocaleString()}</div>
+      <div class="card-sub">${currentPlatform === 'All' ? 'All platforms' : currentPlatform}</div>
+    </div>
+    <div class="card cpa">
+      <div class="card-label">Blended CPA</div>
+      <div class="card-value">${fmt(a.cpa,'$')}</div>
+      <div class="card-sub">Cost per conversion</div>
+    </div>
+    <div class="card ctr">
+      <div class="card-label">Avg CTR</div>
+      <div class="card-value">${fmt(a.ctr,'%')}</div>
+      <div class="card-sub">Clicks / Impressions</div>
+    </div>
+    <div class="card impr">
+      <div class="card-label">Total Impressions</div>
+      <div class="card-value">${fmt(a.impressions,'M')}</div>
+      <div class="card-sub">Ad reach</div>
+    </div>
+  `;
+}
+
+// ── PLATFORM CHART ────────────────────────────────────────────────────
+function renderPlatformChart() {
+  const metric = currentPlatformMetric;
+  const labels = [];
+  const values = [];
+  const bgColors = [];
+
+  PLATFORM_ORDER.forEach(p => {
+    const rows = RAW_DATA.filter(r => r.platform === p &&
+      (currentCampaign === 'All' || r.campaign_name === currentCampaign));
+    if (!rows.length) return;
+    const a = kpis(agg(rows));
+    labels.push(p);
+    values.push(metric === 'ctr' ? +(a.ctr*100).toFixed(3) :
+                metric === 'impressions' ? +(a.impressions/1e6).toFixed(2) :
+                +a[metric].toFixed(2));
+    bgColors.push(COLORS[p].bg);
+  });
+
+  const ctx = document.getElementById('platformChart').getContext('2d');
+  if (charts.platform) charts.platform.destroy();
+  charts.platform = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: bgColors,
+        borderRadius: 8,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#2d3748' }, ticks: { color: '#a0aec0' } },
+        y: {
+          grid: { color: '#2d3748' }, ticks: { color: '#a0aec0' },
+          title: {
+            display: true, color: '#718096',
+            text: metric === 'cpa' ? 'CPA ($)' :
+                  metric === 'ctr' ? 'CTR (%)' :
+                  metric === 'cpm' ? 'CPM ($)' :
+                  metric === 'impressions' ? 'Impressions (M)' : metric
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── PIE CHARTS ────────────────────────────────────────────────────────
+function renderPies() {
+  const spends = [], convs = [], labels = [], colors = [];
+  PLATFORM_ORDER.forEach(p => {
+    const rows = RAW_DATA.filter(r => r.platform === p);
+    const a = agg(rows);
+    labels.push(p); spends.push(a.spend); convs.push(a.conversions);
+    colors.push(COLORS[p].bg);
+  });
+
+  ['budgetPie','convPie'].forEach((id,i) => {
+    const ctx = document.getElementById(id).getContext('2d');
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{ data: i===0?spends:convs, backgroundColor: colors, borderWidth: 2, borderColor: '#1a1f2e' }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#a0aec0', font: { size: 11 }, boxWidth: 12, padding: 8 } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+                const pct = (ctx.raw/total*100).toFixed(1);
+                return ` ${ctx.label}: ${pct}%`;
+              }
+            }
+          }
+        }
+      }
+    });
+  });
+}
+
+// ── TREND CHART ───────────────────────────────────────────────────────
+function updateTrendChart() {
+  const metric = document.getElementById('trendMetric').value;
+  const weeks = [1,2,3,4,5];
+  const datasets = PLATFORM_ORDER.map(p => {
+    const data = weeks.map(w => {
+      const rows = RAW_DATA.filter(r => {
+        const day = parseInt(r.date.split('-')[2]);
+        const week = Math.floor((day-1)/7)+1;
+        return r.platform === p && week === w &&
+          (currentCampaign === 'All' || r.campaign_name === currentCampaign);
+      });
+      if (!rows.length) return null;
+      const a = kpis(agg(rows));
+      return metric === 'ctr' ? +(a.ctr*100).toFixed(3) : +a[metric].toFixed(2);
+    });
+    return {
+      label: p,
+      data,
+      borderColor: COLORS[p].border,
+      backgroundColor: COLORS[p].border + '20',
+      tension: 0.4,
+      fill: true,
+      pointBackgroundColor: COLORS[p].border,
+      pointRadius: 5,
+    };
+  });
+
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  if (charts.trend) charts.trend.destroy();
+  charts.trend = new Chart(ctx, {
+    type: 'line',
+    data: { labels: ['Week 1','Week 2','Week 3','Week 4','Week 5'], datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#a0aec0', font: { size: 12 } } }
+      },
+      scales: {
+        x: { grid: { color: '#2d3748' }, ticks: { color: '#a0aec0' } },
+        y: { grid: { color: '#2d3748' }, ticks: { color: '#a0aec0' } }
+      }
+    }
+  });
+}
+
+// ── CAMPAIGN TABLE ────────────────────────────────────────────────────
+function renderTable() {
+  const rows = filtered();
+  const camps = {};
+  rows.forEach(r => {
+    const k = r.platform + '|' + r.campaign_name;
+    if (!camps[k]) camps[k] = { platform: r.platform, campaign_name: r.campaign_name, spend:0, conversions:0, impressions:0, clicks:0 };
+    camps[k].spend += r.spend;
+    camps[k].conversions += r.conversions;
+    camps[k].impressions += r.impressions;
+    camps[k].clicks += r.clicks;
+  });
+
+  let data = Object.values(camps).map((c,i) => ({
+    ...c,
+    cpa: c.conversions ? c.spend/c.conversions : 999,
+    ctr: c.impressions ? c.clicks/c.impressions : 0,
+    cpm: c.impressions ? c.spend/c.impressions*1000 : 0,
+  }));
+
+  data.sort((a,b) => {
+    const v = sortKey === 'platform' || sortKey === 'campaign_name'
+      ? a[sortKey].localeCompare(b[sortKey])
+      : a[sortKey] - b[sortKey];
+    return sortAsc ? v : -v;
+  });
+
+  const maxCpa = Math.max(...data.map(d=>d.cpa));
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = data.map((d,i) => `
+    <tr>
+      <td style="color:#718096;font-size:12px">${i+1}</td>
+      <td><span class="platform-tag ${d.platform}">${d.platform}</span></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${d.campaign_name.replace(/_/g,' ')}</td>
+      <td>$${d.spend.toLocaleString('en-US',{maximumFractionDigits:0})}</td>
+      <td>${d.conversions.toLocaleString()}</td>
+      <td class="${d.cpa < 7 ? 'good' : d.cpa > 15 ? 'bad' : ''}">
+        $${d.cpa.toFixed(2)}
+      </td>
+      <td>${(d.ctr*100).toFixed(2)}%</td>
+      <td>$${d.cpm.toFixed(2)}</td>
+      <td>${(d.impressions/1e6).toFixed(2)}M</td>
+    </tr>
+  `).join('');
+
+  // update sorted header
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
+}
+
+// ── TIKTOK FUNNEL ─────────────────────────────────────────────────────
+function renderFunnel() {
+  const tt = RAW_DATA.filter(r => r.platform === 'TikTok');
+  const totalViews = tt.reduce((s,r) => s+r.video_views, 0);
+  const checkpoints = [
+    { key: 'video_views',    label: 'Video Views',    color: '#4299e1' },
+    { key: 'video_watch_25', label: '25% Watched',    color: '#68d391' },
+    { key: 'video_watch_50', label: '50% Watched',    color: '#f6ad55' },
+    { key: 'video_watch_75', label: '75% Watched',    color: '#fc8181' },
+    { key: 'video_watch_100',label: 'Completed 100%', color: '#f687b3' },
+  ];
+
+  let prev = totalViews;
+  const html = checkpoints.map((c,i) => {
+    const total = tt.reduce((s,r) => s+(r[c.key]||0), 0);
+    const pct = totalViews ? (total/totalViews*100) : 0;
+    const drop = i > 0 ? -((prev-total)/prev*100).toFixed(1) : null;
+    prev = total;
+    return `
+      <div class="funnel-row">
+        <div class="funnel-label">${c.label}</div>
+        <div class="funnel-bar-wrap">
+          <div class="funnel-bar" style="width:${pct}%;background:${c.color}20;border:1px solid ${c.color}40">
+            <span style="color:${c.color};font-size:11px">${(total/1e6).toFixed(1)}M</span>
+          </div>
+        </div>
+        <div class="funnel-pct" style="color:${c.color}">${pct.toFixed(1)}%</div>
+        <div class="funnel-drop">${drop !== null ? drop+'%' : ''}</div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('funnel').innerHTML = html;
+}
+
+// ── QUALITY SCORE CHART ───────────────────────────────────────────────
+function renderQSChart() {
+  const gg = RAW_DATA.filter(r => r.platform === 'Google' && r.quality_score);
+  const groups = {};
+  gg.forEach(r => {
+    const qs = r.quality_score;
+    if (!groups[qs]) groups[qs] = [];
+    groups[qs].push(r.clicks / r.impressions * 100);
+  });
+  const labels = Object.keys(groups).sort((a,b)=>+a-+b);
+  const values = labels.map(qs => {
+    const arr = groups[qs];
+    return +(arr.reduce((s,v)=>s+v,0)/arr.length).toFixed(2);
+  });
+
+  const ctx = document.getElementById('qsChart').getContext('2d');
+  if (charts.qs) charts.qs.destroy();
+  charts.qs = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels.map(q=>`QS ${q}`),
+      datasets: [{
+        label: 'Avg CTR (%)',
+        data: values,
+        backgroundColor: labels.map(q => +q >= 9 ? '#68d391aa' : +q >= 8 ? '#63b3edaa' : +q >= 7 ? '#f6ad55aa' : '#fc8181aa'),
+        borderRadius: 8,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` CTR: ${ctx.raw}%` } }
+      },
+      scales: {
+        x: { grid: { color: '#2d3748' }, ticks: { color: '#a0aec0' }, title: { display: true, color: '#718096', text: 'Avg CTR (%)' } },
+        y: { grid: { color: '#2d3748' }, ticks: { color: '#a0aec0' } }
+      }
+    }
+  });
+}
+
+// ── FILTER ACTIONS ────────────────────────────────────────────────────
+function filterPlatform(p, btn) {
+  currentPlatform = p;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAll();
+}
+
+function filterCampaign(c) {
+  currentCampaign = c;
+  renderAll();
+}
+
+function switchPlatformTab(metric, btn) {
+  currentPlatformMetric = metric;
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPlatformChart();
+}
+
+function sortTable(key) {
+  if (sortKey === key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = true; }
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
+  renderTable();
+}
+
+// ── RENDER ALL ────────────────────────────────────────────────────────
+function renderAll() {
+  renderScorecards();
+  renderPlatformChart();
+  renderPies();
+  updateTrendChart();
+  renderTable();
+  renderFunnel();
+  renderQSChart();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────
+populateCampaigns();
+renderAll();
+</script>
+</body>
+</html>
