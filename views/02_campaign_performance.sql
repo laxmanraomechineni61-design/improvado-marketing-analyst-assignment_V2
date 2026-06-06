@@ -14,7 +14,7 @@
     - Sankey : source = platform, target = campaign_name, value = total_spend
 */
 
-CREATE OR REPLACE VIEW `improvado-assignment-analytics.marketing_data.campaign_performance` AS
+CREATE OR REPLACE VIEW `improvado-assignment-498500.marketing_data.campaign_performance` AS
 
 SELECT
     platform,
