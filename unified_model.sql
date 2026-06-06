@@ -1,54 +1,60 @@
--- this query is for combining all 3 platform data into one table
--- facebook, google and tiktok data is there for january 2024
--- i am using bigquery standard sql for this
--- will use this unified table in looker studio for dashboard
+/*
+  unified_model.sql
+  -----------------
+  Combines Facebook, Google Ads, and TikTok into one normalized table
+  for cross-channel performance analysis in Looker Studio.
 
--- some things i noticed in data and handled:
---   facebook is using "spend" column but google and tiktok using "cost" so i made it same as spend
---   facebook calling it ad_set_id, google is ad_group_id, tiktok is adgroup_id.. all different so normalized to ad_group_id
---   some columns are only in one platform like quality_score is only google, likes/shares only tiktok etc
---   for those columns i put NULL in other platforms, that way structure is same for all
---   calculated ctr, cpa, cpm in the query itself so dont have to do it in dashboard
+  Source dataset : improvado-assignment-498500.marketing_data
+  Period         : January 2024
+  Output rows    : 330 (110 per platform)
+
+  Normalization decisions:
+  - "cost" (Google, TikTok) → renamed to "spend" to match Facebook
+  - "ad_set_id" (Facebook), "adgroup_id" (TikTok) → renamed to "ad_group_id"
+  - CTR recalculated from raw clicks/impressions across all platforms
+    (overrides Google's natively reported ctr for cross-platform consistency)
+  - Platform-specific columns filled with NULL on other platforms so every
+    row shares the same 28-column schema
+*/
 
 WITH facebook AS (
 
     SELECT
         date,
-        'Facebook'                          AS platform,
+        'Facebook'                              AS platform,
         campaign_id,
         campaign_name,
-        ad_set_id                           AS ad_group_id,      -- facebook calls it ad_set_id, making it same name
-        ad_set_name                         AS ad_group_name,
+        ad_set_id                               AS ad_group_id,
+        ad_set_name                             AS ad_group_name,
         impressions,
         clicks,
-        spend,                                                    -- facebook already has spend column, no change needed
+        spend,
         conversions,
         video_views,
 
-        -- these metrics i calculated here only
-        SAFE_DIVIDE(clicks, impressions)            AS ctr,       -- clicks divided by impressions
-        SAFE_DIVIDE(spend, conversions)             AS cpa,       -- how much we spending per conversion
-        SAFE_DIVIDE(spend, impressions) * 1000      AS cpm,       -- cost per 1000 impressions
+        SAFE_DIVIDE(clicks, impressions)        AS ctr,
+        SAFE_DIVIDE(spend, conversions)         AS cpa,
+        SAFE_DIVIDE(spend, impressions) * 1000  AS cpm,
 
-        -- only facebook has these columns
+        -- Facebook-only engagement metrics
         engagement_rate,
         reach,
         frequency,
 
-        -- google columns not there in facebook so putting null
-        NULL                                AS conversion_value,
-        NULL                                AS avg_cpc,
-        NULL                                AS quality_score,
-        NULL                                AS search_impression_share,
+        -- Google-only columns → NULL for Facebook
+        NULL AS conversion_value,
+        NULL AS avg_cpc,
+        NULL AS quality_score,
+        NULL AS search_impression_share,
 
-        -- tiktok columns also not in facebook
-        NULL                                AS video_watch_25,
-        NULL                                AS video_watch_50,
-        NULL                                AS video_watch_75,
-        NULL                                AS video_watch_100,
-        NULL                                AS likes,
-        NULL                                AS shares,
-        NULL                                AS comments
+        -- TikTok-only columns → NULL for Facebook
+        NULL AS video_watch_25,
+        NULL AS video_watch_50,
+        NULL AS video_watch_75,
+        NULL AS video_watch_100,
+        NULL AS likes,
+        NULL AS shares,
+        NULL AS comments
 
     FROM `improvado-assignment-498500.marketing_data.facebook_ads`
 
@@ -58,41 +64,41 @@ google AS (
 
     SELECT
         date,
-        'Google'                            AS platform,
+        'Google'                                AS platform,
         campaign_id,
         campaign_name,
-        ad_group_id,                                             -- google already has this name so no change
+        ad_group_id,
         ad_group_name,
         impressions,
         clicks,
-        cost                                AS spend,            -- google calls it cost, changing to spend
+        cost                                    AS spend,
         conversions,
-        NULL                                AS video_views,      -- google search and shopping dont have video views
+        NULL                                    AS video_views,
 
-        -- same metrics calculated
-        SAFE_DIVIDE(clicks, impressions)            AS ctr,
-        SAFE_DIVIDE(cost, conversions)              AS cpa,
-        SAFE_DIVIDE(cost, impressions) * 1000       AS cpm,
+        -- Recalculated for consistency; Google's native ctr column is not carried forward
+        SAFE_DIVIDE(clicks, impressions)        AS ctr,
+        SAFE_DIVIDE(cost, conversions)          AS cpa,
+        SAFE_DIVIDE(cost, impressions) * 1000   AS cpm,
 
-        -- facebook columns not there in google
-        NULL                                AS engagement_rate,
-        NULL                                AS reach,
-        NULL                                AS frequency,
+        -- Facebook-only columns → NULL for Google
+        NULL AS engagement_rate,
+        NULL AS reach,
+        NULL AS frequency,
 
-        -- only google has these columns
+        -- Google-only metrics
         conversion_value,
         avg_cpc,
-        quality_score,                                           -- this is useful for search campaigns
+        quality_score,
         search_impression_share,
 
-        -- tiktok columns not in google
-        NULL                                AS video_watch_25,
-        NULL                                AS video_watch_50,
-        NULL                                AS video_watch_75,
-        NULL                                AS video_watch_100,
-        NULL                                AS likes,
-        NULL                                AS shares,
-        NULL                                AS comments
+        -- TikTok-only columns → NULL for Google
+        NULL AS video_watch_25,
+        NULL AS video_watch_50,
+        NULL AS video_watch_75,
+        NULL AS video_watch_100,
+        NULL AS likes,
+        NULL AS shares,
+        NULL AS comments
 
     FROM `improvado-assignment-498500.marketing_data.google_ads`
 
@@ -102,38 +108,37 @@ tiktok AS (
 
     SELECT
         date,
-        'TikTok'                            AS platform,
+        'TikTok'                                AS platform,
         campaign_id,
         campaign_name,
-        adgroup_id                          AS ad_group_id,      -- tiktok calling it adgroup_id, normalizing
-        adgroup_name                        AS ad_group_name,
+        adgroup_id                              AS ad_group_id,
+        adgroup_name                            AS ad_group_name,
         impressions,
         clicks,
-        cost                                AS spend,            -- tiktok also using cost, changing to spend
+        cost                                    AS spend,
         conversions,
         video_views,
 
-        -- same metrics
-        SAFE_DIVIDE(clicks, impressions)            AS ctr,
-        SAFE_DIVIDE(cost, conversions)              AS cpa,
-        SAFE_DIVIDE(cost, impressions) * 1000       AS cpm,
+        SAFE_DIVIDE(clicks, impressions)        AS ctr,
+        SAFE_DIVIDE(cost, conversions)          AS cpa,
+        SAFE_DIVIDE(cost, impressions) * 1000   AS cpm,
 
-        -- facebook columns not in tiktok
-        NULL                                AS engagement_rate,
-        NULL                                AS reach,
-        NULL                                AS frequency,
+        -- Facebook-only columns → NULL for TikTok
+        NULL AS engagement_rate,
+        NULL AS reach,
+        NULL AS frequency,
 
-        -- google columns not in tiktok
-        NULL                                AS conversion_value,
-        NULL                                AS avg_cpc,
-        NULL                                AS quality_score,
-        NULL                                AS search_impression_share,
+        -- Google-only columns → NULL for TikTok
+        NULL AS conversion_value,
+        NULL AS avg_cpc,
+        NULL AS quality_score,
+        NULL AS search_impression_share,
 
-        -- tiktok has video engagement data which other platforms dont have
-        video_watch_25,                                          -- how many people watched 25% of video
+        -- TikTok video completion funnel
+        video_watch_25,
         video_watch_50,
         video_watch_75,
-        video_watch_100,                                         -- completed views
+        video_watch_100,
         likes,
         shares,
         comments
@@ -142,8 +147,7 @@ tiktok AS (
 
 )
 
--- union all 3 platforms together
--- using union all not union because we dont want to remove duplicates
+-- UNION ALL (not UNION) because rows are guaranteed distinct across platforms
 SELECT * FROM facebook
 UNION ALL
 SELECT * FROM google
